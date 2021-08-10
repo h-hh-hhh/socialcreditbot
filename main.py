@@ -1,77 +1,81 @@
 import os
-import os
 
 import discord
-from discord.ext import commands
-import storage123 as s
+from discord.ext import tasks, commands
+import json
 
 default_prefix = '$'
 async def determine_prefix(bot, message):
     guild = message.guild
     #Only allow custom prefixs in guild
     if guild:
-        return s.Handle(str(guild.id), "check", "prefix")
+        return bot.prefix
     else:
         return default_prefix
 
-bot = commands.Bot(command_prefix=determine_prefix)
+intents = discord.Intents.all()
+intents.members = True
+
+bot = commands.Bot(command_prefix=determine_prefix, intents=discord.Intents.all())
+
+bot.creditAddMsg = "Attention citizen! "
+bot.creditRemoveMsg = "Attention citizen! "
+bot.creditAddMsg2 = " social points have been added to your account! Chairman Ingen is satisfied with your behavior! Glory to Ingenistan!\n\nhttps://cdn.discordapp.com/attachments/800812999656341545/874410096145342504/video0-31.mp4 "
+bot.creditRemoveMsg2 = " social points have been deducted from your account! Chairman Ingen is NOT satisfied with your behavior! Glory to Ingenistan!\n\nhttps://cdn.discordapp.com/attachments/800812999656341545/874410096145342504/video0-31.mp4 "
+bot.prefix = "$"
+bot.threshold1 = 400
+bot.threshold2 = 600
+bot.threshold3 = 1200
+bot.threshold4 = 1500
+bot.threshold1role = 874454569889964032
+bot.threshold12role = 874454522217508944
+bot.threshold23role = 874454491624263701
+bot.threshold34role = 874454451539308624
+bot.threshold4role = 874454309943799828
+
+memberCredits = json.load(open('varStorage.json'))
 
 @bot.event
 async def on_ready():
     print(f'{bot.user} has connected to Discord!')
-    for guild in bot.guilds:
-        if s.Handle(str(guild.id), "check", "creditAddMsg") == "User doesnt exist in database":
-            s.Handle(str(guild.id), "add", "creditAddMsg", "Attention citizen! ")
-        if s.Handle(str(guild.id), "check", "creditRemoveMsg") == "User doesnt exist in database":
-            s.Handle(str(guild.id), "add", "creditRemoveMsg", "Attention citizen! ")
-        if s.Handle(str(guild.id), "check", "creditAddMsg2") == "User doesnt exist in database":
-            s.Handle(str(guild.id), "add", "creditAddMsg2", " social points have been added to your account!")
-        if s.Handle(str(guild.id), "check", "creditRemoveMsg2") == "User doesnt exist in database":
-            s.Handle(str(guild.id), "add", "creditRemoveMsg2", " social points have been deducted from your account!")
-        if s.Handle(str(guild.id), "check", "prefix") == "User doesnt exist in database":
-            s.Handle(str(guild.id), "add", "prefix", "$")
-        if s.Handle(str(guild.id), "check", "threshold1") == "User doesnt exist in database":
-            s.Handle(str(guild.id), "add", "threshold1", 400)
-        if s.Handle(str(guild.id), "check", "threshold2") == "User doesnt exist in database":
-            s.Handle(str(guild.id), "add", "threshold2", 600)
-        if s.Handle(str(guild.id), "check", "threshold3") == "User doesnt exist in database":
-            s.Handle(str(guild.id), "add", "threshold3", 1200)
-        if s.Handle(str(guild.id), "check", "threshold4") == "User doesnt exist in database":
-            s.Handle(str(guild.id), "add", "threshold4", 1500)
-        if s.Handle(str(guild.id), "check", "threshold1role") == "User doesnt exist in database":
-            s.Handle(str(guild.id), "add", "threshold1role", "None")
-        if s.Handle(str(guild.id), "check", "threshold12role") == "User doesnt exist in database":
-            s.Handle(str(guild.id), "add", "threshold12role", "None")
-        if s.Handle(str(guild.id), "check", "threshold23role") == "User doesnt exist in database":
-            s.Handle(str(guild.id), "add", "threshold23role", "None")
-        if s.Handle(str(guild.id), "check", "threshold34role") == "User doesnt exist in database":
-            s.Handle(str(guild.id), "add", "threshold34role", "None")
-        if s.Handle(str(guild.id), "check", "threshold4role") == "User doesnt exist in database":
-             s.Handle(str(guild.id), "add", "threshold4role", "None")
-        for member in guild.members:
-            if s.Handle('.'.join((str(guild.id), str(member.id))), "check", "credit") == "User doesnt exist in database":
-                s.Handle('.'.join((str(guild.id), str(member.id))), "add", "credit", 1000)
 
 @bot.command(name="check")
 async def check(ctx, member: discord.Member=None):
-    if member is None:
-        member = ctx.message.author
-    id = '.'.join((str(ctx.guild.id), str(member.id)))
-    outl = s.Handle(id, "check", "credit")
+  if member is None:
+      member = ctx.message.author
+  try:
+    await ctx.send(memberCredits[member.id])
+    json.dump(memberCredits, open('varStorage.json', 'w'))
+  except KeyError:
+    memberCredits[member.id] = 1000
+    json.dump(memberCredits, open('varStorage.json', 'w'))
+  print("h")
+  return
 
-    await ctx.send(outl)
 
 @bot.command(name="add")
 @commands.has_permissions(administrator=True)
 async def add(ctx, member: discord.Member=None, amount: int=0):
-    if member is None:
-        await ctx.send("You're supposed to provide a user!")
-        return
-    id = '.'.join((str(ctx.guild.id), str(member.id)))
-    s.Handle(id, "add", "credit", s.Handle(id, "check", "credit") + amount)
-    outl = (s.Handle(str(ctx.guild.id), "check", "creditAddMsg") + str(amount) + s.Handle(str(ctx.guild.id), "check", "creditAddMsg2") + member.mention) if amount > 0 else (s.Handle(str(ctx.guild.id), "check", "creditRemoveMsg") + str(-amount) + s.Handle(str(ctx.guild.id), "check", "creditRemoveMsg2") + member.mention)
+  if member is None:
+      await ctx.send("You're supposed to provide a user!")
+      return
+  try:
+    memberCredits[member.id] += amount
+    outl = (bot.creditAddMsg + str(amount) + bot.creditAddMsg2 + member.mention) if amount > 0 else (bot.creditRemoveMsg + str(amount) + bot.creditRemoveMsg2 + member.mention)
+    
+    json.dump(memberCredits, open('varStorage.json', 'w'))
 
     await ctx.send(outl)
+    return
+  except KeyError:
+    memberCredits[member.id] = 1000
+    memberCredits[member.id] += amount
+    outl = (bot.creditAddMsg + str(amount) + bot.creditAddMsg2 + member.mention) if amount >= 0 else (bot.creditRemoveMsg + str(amount) + bot.creditRemoveMsg2 + member.mention)
+    
+    json.dump(memberCredits, open('varStorage.json', 'w'))
+
+    await ctx.send(outl)
+    return
 
 @bot.command(name="setprefix")
 @commands.has_permissions(administrator=True)
@@ -79,67 +83,77 @@ async def setPrefix(ctx, prefix=None):
     if prefix == None:
         await ctx.send("You're supposed to provide a prefix!")
         return
-    s.Handle(str(ctx.guild.id), "add", "prefix", prefix)
+    bot.prefix = prefix
     
-    await ctx.send("Prefix successfully changed to " + prefix)
+    await ctx.send("Prefix successfully changed to " + bot.prefix)
+    return
 
-@bot.command(name="setvariable")
-@commands.has_permissions(administrator=True)
-async def setVar(ctx, var=None, val=None):
-    if var == None:
-        await ctx.send("You're supposed to provide a variable!")
-        return
-    if val == None:
-        await ctx.send("You're supposed to provide a value!")
-        return
-    s.Handle(str(ctx.guild.id), "add", var, val)
+# @bot.command(name="setvariable")
+# @commands.has_permissions(administrator=True)
+# async def setVar(ctx, var=None, val=None):
+#     if var == None:
+#         await ctx.send("You're supposed to provide a variable!")
+#         return
+#     if val == None:
+#         await ctx.send("You're supposed to provide a value!")
+#         return
+#     s.Handle(str(ctx.guild.id), "add", var, val)
 
-    await ctx.send("Variable \"" + var + "\" successfully changed to: " + val)
+#     await ctx.send("Variable \"" + var + "\" successfully changed to: " + val)
 
-@bot.event
-async def on_message(message):
-    if s.Handle('.'.join((str(message.guild.id), str(message.author.id))), "check", "credit") <= s.Handle(str(message.guild.id), "check", "threshold1"):
-        if s.Handle(str(message.guild.id), "check", "threshold1role") != "None":
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold1role")))) if (s.Handle(str(message.guild.id), "check", "threshold1role") != "None") else h()
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold12role")))) if (s.Handle(str(message.guild.id), "check", "threshold12role") != "None") else h()
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold23role")))) if (s.Handle(str(message.guild.id), "check", "threshold23role") != "None") else h()
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold34role")))) if (s.Handle(str(message.guild.id), "check", "threshold34role") != "None") else h()
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold4role")))) if (s.Handle(str(message.guild.id), "check", "threshold4role") != "None") else h()
-            await message.author.add_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold1role"))))
-    if s.Handle(str(message.guild.id), "check", "threshold1") < s.Handle('.'.join((str(message.guild.id), str(message.author.id))), "check", "credit") <= s.Handle(str(message.guild.id), "check", "threshold2"):
-        if s.Handle(str(message.guild.id), "check", "threshold12role") != "None":
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold1role")))) if (s.Handle(str(message.guild.id), "check", "threshold1role") != "None") else h()
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold12role")))) if (s.Handle(str(message.guild.id), "check", "threshold12role") != "None") else h()
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold23role")))) if (s.Handle(str(message.guild.id), "check", "threshold23role") != "None") else h()
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold34role")))) if (s.Handle(str(message.guild.id), "check", "threshold34role") != "None") else h()
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold4role")))) if (s.Handle(str(message.guild.id), "check", "threshold4role") != "None") else h()
-            await message.author.add_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold12role"))))
-    if s.Handle(str(message.guild.id), "check", "threshold2") < s.Handle('.'.join((str(message.guild.id), str(message.author.id))), "check", "credit") <= s.Handle(str(message.guild.id), "check", "threshold3"):
-        if s.Handle(str(message.guild.id), "check", "threshold23role") != "None":
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold1role")))) if (s.Handle(str(message.guild.id), "check", "threshold1role") != "None") else h()
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold12role")))) if (s.Handle(str(message.guild.id), "check", "threshold12role") != "None") else h()
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold23role")))) if (s.Handle(str(message.guild.id), "check", "threshold23role") != "None") else h()
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold34role")))) if (s.Handle(str(message.guild.id), "check", "threshold34role") != "None") else h()
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold4role")))) if (s.Handle(str(message.guild.id), "check", "threshold4role") != "None") else h()
-            await message.author.add_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold23role"))))
-    if s.Handle(str(message.guild.id), "check", "threshold3") < s.Handle('.'.join((str(message.guild.id), str(message.author.id))), "check", "credit") <= s.Handle(str(message.guild.id), "check", "threshold4"):
-        if s.Handle(str(message.guild.id), "check", "threshold34role") != "None":
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold1role")))) if (s.Handle(str(message.guild.id), "check", "threshold1role") != "None") else h()
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold12role")))) if (s.Handle(str(message.guild.id), "check", "threshold12role") != "None") else h()
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold23role")))) if (s.Handle(str(message.guild.id), "check", "threshold23role") != "None") else h()
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold34role")))) if (s.Handle(str(message.guild.id), "check", "threshold34role") != "None") else h()
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold4role")))) if (s.Handle(str(message.guild.id), "check", "threshold4role") != "None") else h()
-            await message.author.add_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold34role"))))
-    if s.Handle(str(message.guild.id), "check", "threshold4") < s.Handle('.'.join((str(message.guild.id), str(message.author.id))), "check", "credit"):
-        if s.Handle(str(message.guild.id), "check", "threshold4role") != "None":
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold1role")))) if (s.Handle(str(message.guild.id), "check", "threshold1role") != "None") else h()
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold12role")))) if (s.Handle(str(message.guild.id), "check", "threshold12role") != "None") else h()
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold23role")))) if (s.Handle(str(message.guild.id), "check", "threshold23role") != "None") else h()
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold34role")))) if (s.Handle(str(message.guild.id), "check", "threshold34role") != "None") else h()
-            await message.author.remove_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold4role")))) if (s.Handle(str(message.guild.id), "check", "threshold4role") != "None") else h()
-            await message.author.add_roles(discord.utils.get(message.guild.roles, id = str(s.Handle(str(message.guild.id), "check", "threshold4role"))))
+@tasks.loop(seconds=0.5)
+async def update_roles():
+  try:
+    for guild in bot.guilds:
+      for member in guild.members:
+        if memberCredits[member.id] <= bot.threshold1:
+          if bot.threshold1role != "None":
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold1role))
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold12role))
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold23role))
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold34role))
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold4role))
+            await member.add_roles(discord.utils.get(guild.roles, id = bot.threshold1role))
+        if bot.threshold1 < memberCredits[member.id] <= bot.threshold2:
+          if bot.threshold12role != "None":
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold1role))
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold12role))
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold23role))
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold34role))
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold4role))
+            await member.add_roles(discord.utils.get(guild.roles, id = bot.threshold12role))
+        if bot.threshold2 < memberCredits[member.id] <= bot.threshold3:
+          if bot.threshold23role != "None":
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold1role))
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold12role))
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold23role))
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold34role))
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold4role))
+            await member.add_roles(discord.utils.get(guild.roles, id = bot.threshold23role))
+        if bot.threshold3 < memberCredits[member.id] <= bot.threshold4:
+          if bot.threshold34role != "None":
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold1role))
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold12role))
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold23role))
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold34role))
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold4role))
+            await member.add_roles(discord.utils.get(guild.roles, id = bot.threshold34role))
+        if bot.threshold4 < memberCredits[member.id]:
+          if bot.threshold4role != "None":
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold1role))
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold12role))
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold23role))
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold34role))
+            await member.remove_roles(discord.utils.get(guild.roles, id = bot.threshold4role))
+            await member.add_roles(discord.utils.get(guild.roles, id = bot.threshold4role))
 
-    await bot.process_commands(message)
+      
+      json.dump(memberCredits, open('varStorage.json', 'w'))
+  except KeyError:
+    memberCredits[member.id] = 1000
+    json.dump(memberCredits, open('varStorage.json', 'w'))
+  except AttributeError:
+    return
 
 async def h():
     return
@@ -154,6 +168,5 @@ async def h():
 #             f.write(f'Unhandled message: {args[0]}\n')
 #         else:
 #             raise 
-
 
 bot.run(os.environ['token12345'])
